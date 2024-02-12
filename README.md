@@ -11,8 +11,10 @@ map https://www.google.com/maps/d/u/2/edit?mid=1CaLM2CXrP-lgivVT6Gxmqz9vuL-qEls&
 dataframe >>.parquet https://drive.google.com/file/d/11nebr3Xcmo4lPEnFTGgDP5u_yw_UwMn-/view?usp=sharing
 
 images .zip >>.jpg https://drive.google.com/file/d/1KNKyw9Z7UcgGn4DihphHhnFJvXdNn9wC/view?usp=sharing
-
+selected images .zip>>.jpg https://drive.google.com/file/d/1x1614bldalS22Ote4xYx7vlckdVE1_nq/view?usp=sharing
 map https://www.google.com/maps/d/u/2/edit?mid=1RH0-d1fh1l9xQAj_zHLQjrHibSA99AI&usp=sharing
+
+
 
 
 ## members
