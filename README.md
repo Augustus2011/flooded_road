@@ -16,6 +16,8 @@ selected images .zip>>.jpg https://drive.google.com/file/d/1x1614bldalS22Ote4xYx
 
 map https://www.google.com/maps/d/u/2/edit?mid=1RH0-d1fh1l9xQAj_zHLQjrHibSA99AI&usp=sharing
 
+map selected manhole https://www.google.com/maps/d/edit?mid=10G79BBMk0AgbJeNTsBokAT_IjUwyZ5M&usp=sharing
+
 
 
 
