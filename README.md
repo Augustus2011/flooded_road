@@ -5,7 +5,7 @@ dataframe >>.parquet https://drive.google.com/file/d/1hGNRDwf5W-M7GtI6v-51q9k91A
 images .zip >>.jpg https://drive.google.com/file/d/1kkeBIIGqwNVoumHoJ_ei6PIYewVYKw2_/view?usp=drive_link
 
 selected images .zip>>.jpg 
-map https://www.google.com/maps/d/u/2/edit?mid=1CaLM2CXrP-lgivVT6Gxmqz9vuL-qEls&usp=sharing
+map https://www.google.com/maps/d/edit?mid=1XNX_ubfaQLHFyxh903vM2FZGdE71Cmw&usp=sharing
 
 
 
