@@ -2,9 +2,11 @@
 
 dataframe >>.parquet https://drive.google.com/file/d/1hGNRDwf5W-M7GtI6v-51q9k91ArtD4Cu/view?usp=sharing
 
-images .zip >>.jpg https://drive.google.com/file/d/1O7lPcuzH7sx0j-pRHb28VunIMbHdX5Y2/view?usp=sharing
+images .zip >>.jpg https://drive.google.com/file/d/1kkeBIIGqwNVoumHoJ_ei6PIYewVYKw2_/view?usp=drive_link
 
+selected images .zip>>.jpg 
 map https://www.google.com/maps/d/u/2/edit?mid=1CaLM2CXrP-lgivVT6Gxmqz9vuL-qEls&usp=sharing
+
 
 
 # manhole,sinkhole
