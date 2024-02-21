@@ -8,9 +8,10 @@ import pandas as pd
 import os
 from torchvision.models.resnet import ResNet50_Weights
 from tqdm import tqdm
+import numpy as np
 
 class CustomDataset(Dataset):
-    def __init__(self, df=pd.DataFrame(), transform=None):
+    def __init__(self, df:pd.DataFrame, transform=None):
         self.df = df
         self.transform = transform
 
@@ -18,9 +19,9 @@ class CustomDataset(Dataset):
         return len(self.df)
 
     def __getitem__(self, index):
-        img_name =self.df.iloc[index, 1]
+        img_name =self.df.iloc[index, 0]
         image = Image.open(img_name)
-        label = int(self.df.iloc[index, 2])
+        label = int(self.df.iloc[index, 1])
 
         if self.transform:
             image = self.transform(image)
@@ -56,10 +57,12 @@ class ImageClassifier:
         model.fc = torch.nn.Linear(num_ftrs, len(self.train_df['class'].unique()))
         return model
 
-    def train_model(self, model, train_loader, test_loader, criterion, optimizer, num_epochs=15):
+    def train_model(self, model, train_loader, test_loader, criterion, optimizer, num_epochs:int=15,save_hist:str=None):
+        max_acc=0
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         model = model.to(device)
-
+        l_acc=[]
+        l_train_loss=[]
         for epoch in tqdm(range(num_epochs)):
             model.train()
             running_loss = 0.0
@@ -78,6 +81,7 @@ class ImageClassifier:
 
             epoch_loss = running_loss / len(train_loader.dataset)
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f}")
+            l_train_loss.append(epoch_loss)
 
             model.eval()
             correct = 0
@@ -92,28 +96,41 @@ class ImageClassifier:
                     correct += (predicted == labels).sum().item()
 
             accuracy = correct / total
+            if accuracy>max_acc:
+                max_acc=accuracy
+                if epoch>10:
+                    try:
+                        torch.save(model.state_dict(), "/Users/kunkerdthaisong/cils/flooded_road/exp02_best.pt")
+                        print("save complete")
+                    except Exception as e:
+                        print(e)
+
+            
+                
             print(f"Accuracy on test set: {accuracy:.4f}")
+            l_acc.append(accuracy)
 
         print('Training completed.')
         print("try save model")
         try:
-            torch.save(model.state_dict(), "/Users/kunkerdthaisong/cils/flooded_road/exp01.pt")
+            torch.save(model.state_dict(), "/Users/kunkerdthaisong/cils/flooded_road/exp02_last.pt")
             print("save complete")
         except Exception as e:
             print(e)
 
+        
+        np.save(save_hist+"loss_hist.npy",np.asarray(l_train_loss)) #save loss hist
+        np.save(save_hist+"acc_hist.npy",np.asarray(l_acc)) #save acc on valid hist
+
+        def
+
 
 if __name__ == "__main__":
-    train_df = pd.read_csv("/Users/kunkerdthaisong/cils/train.csv")
-    test_df = pd.read_csv("/Users/kunkerdthaisong/cils/test.csv")
-
-
+    train_df = pd.read_csv("/Users/kunkerdthaisong/cils/train_3level.csv")
+    test_df = pd.read_csv("/Users/kunkerdthaisong/cils/test_3level.csv")
     classifier = ImageClassifier(train_df, test_df)
-    train_loader, test_loader = classifier.create_dataloaders(batch_size=4)
+    train_loader, test_loader = classifier.create_dataloaders(batch_size=16)
     model = classifier.create_model()
-
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-
-    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=15)
-
+    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=15,save_hist="/Users/kunkerdthaisong/cils/flooded_road/")
