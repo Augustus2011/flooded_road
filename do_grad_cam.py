@@ -20,7 +20,7 @@ def backward_hook(module,grad_in,grad_out):
 model=torchvision.models.resnet50(weights=ResNet50_Weights.DEFAULT) #change weights to my finetuned
 num_ftrs = model.fc.in_features
 model.fc = torch.nn.Linear(num_ftrs,3)
-model.load_state_dict(torch.load("/Users/kunkerdthaisong/cils/flooded_road/exp02.pt"))
+model.load_state_dict(torch.load("/Users/kunkerdthaisong/cils/flooded_road/training_logs/1/exp02_best.pt"))
 model.eval() #like with torch.no_grad()
 target_layer=model.layer4[-1] #last layer
 
@@ -90,3 +90,4 @@ for i in df["path"]:
   l_img=torchvision.transforms.ToPILImage()(np.uint8(cam_img[:,:,::-1]))
   l_img.save(f"/Users/kunkerdthaisong/cils/selected_streetview/{count}.jpg")
   count+=1
+  

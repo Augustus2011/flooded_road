@@ -17,6 +17,6 @@ def read_from_url(url:str)->Image:
 
 
 
-#url = "https://example.com/image.jpg"
-#save_path = "image.jpg"
-#read_and_save_image(url, save_path)
+#test
+#if __name__=="__main__":
+    #read_from_url()
