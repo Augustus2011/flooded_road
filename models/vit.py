@@ -120,7 +120,7 @@ class VisionTransformer(nn.Module):
         img_size=[224],
         patch_size=16,
         in_chans=3,
-        num_classes=0,
+        num_classes:int=0,
         embed_dim=768,
         depth=12,
         num_heads=12,
@@ -217,6 +217,7 @@ class VisionTransformer(nn.Module):
         for blk in self.blocks:
             x = blk(x)
         x = self.norm(x)
+        x = self.head(x)
         return x[:, 0]
     
     def get_last_selfattention(self, x):
@@ -235,6 +236,7 @@ class VisionTransformer(nn.Module):
             if len(self.blocks) - i <= n:
                 output.append(self.norm(x))
         return output
+    
 class VitGenerator(object):
     def __init__(self,name_model:str,patch_size:int,device,evaluate=True,random=False,verbose=False):
         self.name_model=name_model
@@ -278,7 +280,20 @@ class VitGenerator(object):
                 mlp_ratio=4,
                 qkv_bias=True,
                 norm_layer=nn.LayerNorm,
+                num_classes=2,
             )
+
+        elif self.name_model == "vit_large":
+            model = VisionTransformer(
+                patch_size=self.patch_size,
+                embed_dim=1024,
+                depth=24,
+                num_heads=16,
+                mlp_ratio=4,
+                qkv_bias=True,
+                norm_layer=nn.LayerNorm,
+            )
+
         else:
             raise f"No model found with {self.name_model}"
         print(f"----------select {self.name_model}----------")
@@ -306,7 +321,13 @@ class VitGenerator(object):
 
         elif self.name_model == "vit_base" and self.patch_size == 8:
             url = "dino_vitbase8_pretrain/dino_vitbase8_pretrain.pth"
-
+        
+        elif self.name_model == "vit_large" and self.patch_size == 16:
+            url =None
+        
+        elif self.name_model == "vit_large" and self.patch_size == 8:
+            url =None
+        
         if url is None:
             print(
                 f"Since no pretrained weights have been found with name {self.name_model} and patch size {self.patch_size}, random weights will be used"
@@ -316,7 +337,7 @@ class VitGenerator(object):
             state_dict = torch.hub.load_state_dict_from_url(
                 url="https://dl.fbaipublicfiles.com/dino/" + url
             )
-            self.model.load_state_dict(state_dict, strict=True)
+            self.model.load_state_dict(state_dict, strict=False)
     
     def get_last_selfattention(self, img):
         return self.model.get_last_selfattention(img.to(self.device))

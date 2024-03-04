@@ -6,12 +6,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch import nn
 import warnings
+import cv2
 
 warnings.filterwarnings("ignore")
 
 def transform(img:Image,image_size:int)->torch.Tensor:
-    img=transforms.Resize(image_size)(img)
+    img=transforms.Resize((image_size,image_size))(img)
     img=transforms.ToTensor()(img)
+    img=transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])(img)# mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225].
     return img
 
 def visualize_predict(model,img:torch.Tensor,img_size:int,patch_size:int,device):
@@ -20,7 +22,6 @@ def visualize_predict(model,img:torch.Tensor,img_size:int,patch_size:int,device)
     plot_attention(img,attention)
 
 def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
-     
     w, h = (
         img.shape[1] - img.shape[1] % patch_size,
         img.shape[2] - img.shape[2] % patch_size,
@@ -44,23 +45,21 @@ def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
         .cpu()
         .numpy()
     )
+    attentions=np.mean(attentions,0)
 
     return attentions
 
 def plot_attention(img,attention):
-    n_heads=attention.shape[0]
     plt.figure(figsize=(10,10))
     text=["img","head mean"]
-    for i,fig in enumerate([img,np.mean(attention,0)]):
-        plt.subplot(1,2,i+1)
-        plt.imshow(fig,cmap="inferno")
-        plt.title(text[i])
-    plt.show()
+    img=img.resize((attention.shape[1],attention.shape[1]))
+    plt.subplot(1,2,1)
+    plt.imshow(img)
+    plt.title(text[0])
+    plt.subplot(1,2,2)
+    plt.imshow(attention,cmap="inferno")
+    plt.title(text[1])
 
-    plt.figure(figsize=(10,10))
-    for i in range(n_heads):
-        plt.subplot(n_heads//3,3,i+1)
-        plt.imshow(attention[i],cmap="inferno")
-        plt.title(f"head :{i+1}")
-    plt.tight_layout()
     plt.show()
+    plt.tight_layout()
+    plt.axis(bool=False)

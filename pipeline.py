@@ -3,6 +3,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision.transforms import transforms
 from torchvision.models import resnet50
+from models.vit import VitGenerator 
 from PIL import Image
 import pandas as pd
 import os
@@ -36,8 +37,8 @@ class ImageClassifier:
         self.transform = transforms.Compose([
             transforms.Resize((224,224)),
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-        ])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])# mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225].
+            ])
 
     def create_datasets(self)->Dataset:
         train_dataset = CustomDataset(df=self.train_df, transform=self.transform)
@@ -51,9 +52,11 @@ class ImageClassifier:
         return train_loader, test_loader
 
     def create_model(self):
-        model = resnet50(weights=ResNet50_Weights.DEFAULT)
-        num_ftrs = model.fc.in_features
-        model.fc = torch.nn.Linear(num_ftrs, len(self.train_df['class'].unique()))
+        #model = resnet50(weights=ResNet50_Weights.DEFAULT)
+        model=VitGenerator("vit_base",patch_size=8,device='cpu',evaluate=False,verbose=True)
+
+        #num_ftrs = model.fc.in_features
+        model.model.head = torch.nn.Linear(model.model.embed_dim,len(self.train_df['class'].unique()))
         return model
     
     def plot_jaa(self,plot_what:str=None):
