@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from torch import nn
 import warnings
-import cv2
 
 warnings.filterwarnings("ignore")
 
@@ -16,13 +15,12 @@ def transform(img:Image,image_size:int)->torch.Tensor:
     img=transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225])(img)# mean=[0.485, 0.456, 0.406] and std=[0.229, 0.224, 0.225].
     return img
 
-def visualize_predict(model,img:torch.Tensor,img_size:int,patch_size:int,device):
+def visualize_predict(model,img_name:str,img:torch.Tensor,img_size:int,patch_size:int,device):
     img_pre=transform(img,img_size)
     attention=visualize_attention(model,img_pre,patch_size,device)
-    plot_attention(img,attention)
+    plot_attention(img,attention,img_name)
 
 def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
-    threshold=0.6#
     w, h = (
         img.shape[1] - img.shape[1] % patch_size,
         img.shape[2] - img.shape[2] % patch_size,
@@ -41,8 +39,9 @@ def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
     attentions=attentions.mean(axis=0,keepdims=True) #mean all attn_head
     return attentions
 
-def plot_attention(img,attention):
+def plot_attention(img,attention,img_name):
     plt.figure(figsize=(10,10))
+    plt.title(img_name)
     text=["img","head mean"]
     plt.subplot(1,2,1)
     plt.imshow(img.resize((224,224)))
