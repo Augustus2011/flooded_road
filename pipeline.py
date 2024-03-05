@@ -47,7 +47,7 @@ class ImageClassifier:
 
     def create_dataloaders(self, batch_size:int=12)->DataLoader:
         train_dataset, test_dataset = self.create_datasets()
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=False)
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         return train_loader, test_loader
 
@@ -173,9 +173,9 @@ if __name__ == "__main__":
     train_df = pd.read_csv("/Users/kunkerdthaisong/cils/train_3level.csv")
     test_df = pd.read_csv("/Users/kunkerdthaisong/cils/test_3level.csv")
     classifier = ImageClassifier(train_df, test_df)
-    train_loader, test_loader = classifier.create_dataloaders(batch_size=16)
-    model = classifier.create_model()
+    train_loader, test_loader = classifier.create_dataloaders(batch_size=4)
+    model = classifier.create_model().model
     criterion = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=15)
+    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=1)
     print(classifier.predict(model,test_loader)) #test

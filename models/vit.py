@@ -2,6 +2,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
+from functools import partial
 
 def trunc_normal_(tensor, mean=0.0, std=1.0, a=-2.0, b=2.0):
     return _no_grad_trunc_normal_(tensor, mean, std, a, b)
@@ -130,7 +131,7 @@ class VisionTransformer(nn.Module):
         drop_rate=0.0,
         attn_drop_rate=0.0,
         drop_path_rate=0.0,
-        norm_layer=nn.LayerNorm,
+        norm_layer=partial(nn.LayerNorm,eps=1e-6),
         **kwargs,
     ):
         super().__init__()
@@ -258,7 +259,7 @@ class VitGenerator(object):
                 num_heads=3,
                 mlp_ratio=4,
                 qkv_bias=True,
-                norm_layer=nn.LayerNorm,
+                norm_layer=partial(nn.LayerNorm,eps=1e-6),
             )
         elif self.name_model == "vit_small":
             model = VisionTransformer(
@@ -268,7 +269,7 @@ class VitGenerator(object):
                 num_heads=6,
                 mlp_ratio=4,
                 qkv_bias=True,
-                norm_layer=nn.LayerNorm,
+                norm_layer=partial(nn.LayerNorm,eps=1e-6),
             )
 
         elif self.name_model == "vit_base":
@@ -279,7 +280,7 @@ class VitGenerator(object):
                 num_heads=12,
                 mlp_ratio=4,
                 qkv_bias=True,
-                norm_layer=nn.LayerNorm,
+                norm_layer=partial(nn.LayerNorm,eps=1e-6),
                 num_classes=2,
             )
 
@@ -291,7 +292,7 @@ class VitGenerator(object):
                 num_heads=16,
                 mlp_ratio=4,
                 qkv_bias=True,
-                norm_layer=nn.LayerNorm,
+                norm_layer=partial(nn.LayerNorm,eps=1e-6),
             )
 
         else:

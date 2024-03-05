@@ -22,6 +22,7 @@ def visualize_predict(model,img:torch.Tensor,img_size:int,patch_size:int,device)
     plot_attention(img,attention)
 
 def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
+    threshold=0.6#
     w, h = (
         img.shape[1] - img.shape[1] % patch_size,
         img.shape[2] - img.shape[2] % patch_size,
@@ -30,36 +31,25 @@ def visualize_attention(model,img:torch.Tensor,patch_size:int,device):
 
     w_featmap = img.shape[-2] // patch_size
     h_featmap = img.shape[-1] // patch_size
-
     attentions = model.get_last_selfattention(img.to(device))
-
     nh = attentions.shape[1]
-
-    attentions = attentions[0, :, 0, 1:].reshape(nh, -1)
-
-    attentions = attentions.reshape(nh, w_featmap, h_featmap)
-    attentions = (
-        nn.functional.interpolate(
-            attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest"
-        )[0]
-        .cpu()
-        .numpy()
-    )
-    attentions=np.mean(attentions,0)
-
+    print(nh)
+    print(attentions.shape)
+    attentions=attentions[0,:,0,1:].reshape(nh,-1)
+    attentions=attentions.reshape(nh,w_featmap,h_featmap)
+    attentions = nn.functional.interpolate(attentions.unsqueeze(0), scale_factor=patch_size, mode="nearest")[0].cpu().detach().numpy()
+    attentions=attentions.mean(axis=0,keepdims=True) #mean all attn_head
     return attentions
 
 def plot_attention(img,attention):
     plt.figure(figsize=(10,10))
     text=["img","head mean"]
-    img=img.resize((attention.shape[1],attention.shape[1]))
     plt.subplot(1,2,1)
-    plt.imshow(img)
+    plt.imshow(img.resize((224,224)))
     plt.title(text[0])
     plt.subplot(1,2,2)
-    plt.imshow(attention,cmap="inferno")
+    plt.imshow(attention.squeeze(0),cmap="inferno")
     plt.title(text[1])
-
     plt.show()
     plt.tight_layout()
     plt.axis(bool=False)
