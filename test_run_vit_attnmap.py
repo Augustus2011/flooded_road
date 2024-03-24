@@ -9,8 +9,8 @@ def Main():
     device='cuda' if torch.cuda.is_available() else torch.device("cpu")
     if device=='cuda':
         torch.cuda.set_device(0)
-    name_model='vit_small'
-    patch_size=8
+    name_model='vit_large'
+    patch_size=16
     model=vit.VitGenerator(name_model=name_model,patch_size=patch_size,device=device,evaluate=False,random=False,verbose=True)
     df=pd.read_csv("/Users/kunkerdthaisong/cils/test_3level.csv")
     file_name=df["path"][1]
