@@ -154,7 +154,7 @@ class ImageClassifier:
         else:
             print(f"no model_name: {model_name}")
 
-    def train_model(self, model, train_loader:DataLoader, test_loader:DataLoader, criterion:torch.nn, optimizer:torch.optim, num_epochs:int=15,lr_scheduler=None,unfreeze_each_e:bool=False):
+    def train_model(self, model, train_loader:DataLoader, test_loader:DataLoader, criterion:torch.nn, optimizer:torch.optim, num_epochs:int=15,lr_scheduler=None,unfreeze_each_e:bool=False,use_amp:bool=False):
         self.current_log=""
         #make dir in traning_logs every running
         count_log=len(os.listdir(self.log_path)) #int
@@ -164,7 +164,7 @@ class ImageClassifier:
         else:
             os.makedirs(f"{self.log_path}/"+str(count_log+1))
             self.current_log=self.log_path+"/"+str(count_log+1)+"/"
-            
+        scaler = torch.cuda.amp.GradScaler(enabled=use_amp)
         max_acc=0
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = model.to(device)
@@ -176,21 +176,29 @@ class ImageClassifier:
             if unfreeze_each_e:
                 model=self.unfreeze(epoch=epoch,model=model,model_name="resnet50")
             
-            #set lr ==0.01 at epoch0 (warm-up)
-            #if epoch==0:
-            #    optimizer.param_groups[0]["lr"]=0.01
-            #set lr ==0.001 for normal training
-            #elif epoch==1:
-            #    optimizer.param_groups[0]["lr"]=0.001
+            if epoch==0:#set lr ==0.01 at epoch0 (warm-up)
+                optimizer.param_groups[0]["lr"]=0.01
+            
+            elif epoch==1:#set lr ==0.001 for normal training
+                optimizer.param_groups[0]["lr"]=0.001
                 
             for inputs, labels in train_loader:
-                
                 inputs, labels = inputs.to(device), labels.to(device)
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                loss.backward()
-                optimizer.step()
+                if use_amp:
+                    with torch.cuda.amp.autocast(dtype=torch.float16,enabled=use_amp):
+                        outputs = model(inputs)
+                        loss = criterion(outputs, labels)
+                    scaler.scale(loss).backward()
+                    scaler.step(optimizer)
+                    scaler.update()
+                else:
+                    optimizer.zero_grad()
+                    outputs = model(inputs)
+                    loss = criterion(outputs, labels)
+                    loss.backward()
+                    optimizer.step()
+                    
+                    
                 running_loss += loss.item() * inputs.size(0)
                 
             #lr step 
@@ -200,8 +208,8 @@ class ImageClassifier:
             
             #for logging
             if epoch==0:
-                before_lr = 0.01
-                after_lr = 0.001
+                before_lr = 0.001
+                after_lr = 0.00095
             epoch_loss = running_loss / len(train_loader.dataset)
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f},Lr :{before_lr}/{after_lr}")
             l_train_loss.append(epoch_loss)
@@ -282,7 +290,7 @@ if __name__ == "__main__":
     "epochs": 30,
     "optimizer": "Adam",
     "batch_size":12,
-    "device":"gpu",
+    "device":"cpu",
     "finetune":False,
     }
     )
@@ -294,13 +302,13 @@ if __name__ == "__main__":
     
     #test_df = pd.read_csv("/workspace/august/flooded_road/test_2c_water_no.csv")
     classifier = ImageClassifier(train_df, val_df,log_path=p_dir+"/"+"/training_logs/")
-    train_loader, test_loader = classifier.create_dataloaders(batch_size=12) #i use test_loader
+    train_loader, test_loader = classifier.create_dataloaders(batch_size=12)
     model = classifier.create_model(finetune=False)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-    scheduler=lr_scheduler.ExponentialLR(optimizer, gamma=0.90)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    scheduler=lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
     s=time.time()
-    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=30,lr_scheduler=scheduler,unfreeze_each_e=False)
+    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=30,lr_scheduler=scheduler,unfreeze_each_e=False,use_amp=False)
     e=time.time()
     print(f"take time {e-s}")
     wandb.finish()
