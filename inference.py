@@ -1,7 +1,6 @@
 
 
 import torch
-from torch.utils.data import Dataset, DataLoader
 import torchvision
 #model
 from torchvision.models.resnet import ResNet50_Weights
@@ -13,10 +12,9 @@ from torchvision.transforms import transforms
 from torchvision.transforms.functional import InterpolationMode
 import PIL
 from PIL import Image, ImageDraw, ImageFont
-import pandas as pd
+
 import numpy as np
 import cv2
-import matplotlib.pyplot as plt
 
 
 #do quantize
@@ -27,28 +25,16 @@ from torch.ao.quantization.quantize_fx import convert_fx, prepare_fx
 
 #manage path
 import glob
-import sys
 import os
-from pathlib import Path
 
 
-sys.path.append('../') #"../../" for outer of outer
-from utils_dir.utils import set_all_seed,load_config
-sys.path.append('/workspace/august/ToMe/')
-from tome import patch ,vis
-
-
-import wandb #when i want to do evaluae model perf
-import psutil
-#plot
-import matplotlib.pyplot as plt
 
 class Main:
 
-    def __init__(self,vis_mode:str="vit_ToMe",path_dir:str="/workspace/august/flooded_road/train_test_flood_img/val_/",quantize:bool=False):
+    def __init__(self,vis_mode:str="vit_ToMe",path_dir:str=None,quantize:bool=False):
         self.vis_mode=vis_mode
         self.path_dir=path_dir
-        self.log="/workspace/august/flooded_road/training_logs/30/"
+        self.log="/Users/kunkerdthaisong/cils/flooded_road/training_logs/3/"
         self.quantize=quantize
         
     def draw_and_save(self,img:PIL.Image,cls:int,path_log:str,name:str):
@@ -69,19 +55,6 @@ class Main:
     def run(self):
         if self.vis_mode=="resnet50":
             
-            wandb.init(
-            # set the wandb project where this run will be logged
-            project="flooded_road_no_water_inference",
-            
-            # track hyperparameters and run metadata
-            config={
-            "architecture": "resnet50_imnet1k",
-            "dataset": "flooded_3class",
-            "compress":"no",
-            "batch_size":1,
-            "device":"gpu",
-            }
-            )
             def forward_hook(module,input,output):
                 activation.append(output)
         
@@ -92,8 +65,8 @@ class Main:
             num_ftrs = model.fc.in_features
             model.fc = torch.nn.Linear(num_ftrs,3)
             
-            model.load_state_dict(torch.load("/workspace/august/flooded_road/training_logs/30/exp03_best.pt"))
-            model.to("cuda")
+            model.load_state_dict(torch.load("/Users/kunkerdthaisong/cils/flooded_road/training_logs/3/exp03_best.pt"))
+            model.eval()
             with torch.no_grad(): #like with torch.no_grad()
                 if self.quantize:
                     example_inputs = (torch.randn(1, 3, 224, 224),)
@@ -115,7 +88,6 @@ class Main:
                         out=model(img)
                         e=time.time()
                         self.draw_and_save(img=img1,cls=out.argmax(dim=-1),path_log=self.log,name=name)
-                        wandb.log({"time_per_epoch":e-s})
                     
                 else:
                     target_layer=model.layer4[-1] #last layer
@@ -158,11 +130,11 @@ class Main:
                         out_img=torchvision.transforms.ToPILImage()(np.uint8(cam_img[:,:,::-1]))
                         self.draw_and_save(img=out_img,cls=out.argmax(dim=-1),path_log=self.log,name=name)
                         out_img.save(self.log+name) #3zm
-                        wandb.log({"time_per_epoch":e-s})
+
                 
         elif self.vis_mode=="vit_ToMe":
             model = timm.create_model("vit_base_patch16_224", pretrained=True)
-            patch.timm(model, trace_source=True)
+            #patch.timm(model, trace_source=True)
             input_size = model.default_cfg["input_size"][1]
             transform_list = [
                 transforms.Resize(int((256 / 224) * input_size), interpolation=InterpolationMode.BICUBIC),
@@ -187,7 +159,6 @@ class Main:
             out_img.save("2022-HZYXQB_c1.jpg") #2022-HZYXQB_c1.jpg
         
 if __name__=="__main__":
-    a=set_all_seed(42)
-    a.set_seed()
+    
     main=Main(vis_mode="resnet50",quantize=True) #vis_mode="resnet50","ToMe"
     main.run()

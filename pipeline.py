@@ -4,7 +4,6 @@ import torchvision
 from torchvision.transforms import transforms
 from torch.optim import lr_scheduler
 
- 
 from torchvision.models import resnet50
 from models.vit import VitGenerator 
 #import timm
