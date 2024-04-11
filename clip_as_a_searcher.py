@@ -38,3 +38,6 @@ if __name__ =="__main__":
         if probs.squeeze(0)[:3].sum()>0.5 and probs.squeeze(0)[-1:].sum()<0.2: #probs.squeeze(0)[1] >0.3 and probs.squeeze(0)[:3].sum()>0.55 and probs.squeeze(0)[-2:].sum()<0.25:
             img.save(f"/Users/kunkerdthaisong/cils/images2/{count}.jpg")
         count+=1
+
+
+

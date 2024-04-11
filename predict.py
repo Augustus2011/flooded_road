@@ -8,6 +8,7 @@ from io import BytesIO
 import torch
 import torchvision
 from torchvision.transforms import transforms
+from torch.nn.functional import sigmoid,softmax
 
 
 
@@ -48,7 +49,9 @@ def predict(url: str) -> dict:
             end_time = time.time()
             
             cls = out.argmax(dim=-1).item()
-            data = {"url": url, "result": cls, "time_predict": end_time - start_time}
+            a=softmax(out.squeeze()).numpy()
+            l=[float(i) for i in a]
+            data = {"url": url, "result": cls,"probs":l, "time_predict": end_time - start_time}
             return data
     except Exception as e:
         print(f"Prediction failed for URL: {url}. Error: {e}", file=sys.stderr)

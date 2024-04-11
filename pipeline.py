@@ -2,9 +2,12 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision
 from torchvision.transforms import transforms
+from torchvision.transforms.functional import InterpolationMode
 from torch.optim import lr_scheduler
+import timm
 
-from torchvision.models import resnet50
+#model 
+from torchvision.models import resnet50,densenet121,DenseNet121_Weights
 from models.vit import VitGenerator 
 #import timm
 from torchvision.models.resnet import ResNet50_Weights
@@ -22,10 +25,10 @@ import sys
 import time
 
 
-sys.path.append('../') #"../../" for outer
+sys.path.append('/workspace/data/mea/august/') #"../../" for outer
 from utils_dir.utils import set_all_seed,load_config
-sys.path.append('/workspace/august/ToMe/')
-from tome import patch
+#sys.path.append('/workspace/august/ToMe/')
+#from tome import patch
 
 class CustomDataset(Dataset):
     def __init__(self, df:pd.DataFrame, transform:torchvision.transforms=None):
@@ -38,21 +41,37 @@ class CustomDataset(Dataset):
     def __getitem__(self, index):
         img_name =self.df.iloc[index, 0]
         image = Image.open(img_name).convert('RGB')
-        label = self.df.iloc[index, 1]
+        label = int(self.df.iloc[index, 1])
         if self.transform:
             image = self.transform(image)
         return image, label
 
+
 class ImageClassifier:
-    def __init__(self, train_df:pd.DataFrame, test_df:pd.DataFrame,log_path:str="/Users/kunkerdthaisong/cils/flooded_road/training_logs/"):
+    def __init__(self, train_df:pd.DataFrame, test_df:pd.DataFrame,log_path:str="/workspace/data/mea/august/flooded_road/training_logs/",model_name:str="resnet50"):
         self.train_df = train_df
         self.test_df = test_df
         self.log_path=log_path
-        self.transform = transforms.Compose([
-            transforms.Resize((224,224)),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]),
+        self.model_name=model_name
+        if self.model_name=="resnet50" or self.model_name=="densenet121":
+            self.transform = transforms.Compose([
+                transforms.Resize((224,224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]),
+                ])
+
+
+        if self.model_name=="resnet50v2":
+            self.transform=transforms.Compose([
+                transforms.RandomResizedCrop(size=(224, 224), scale=(0.08, 1.0), ratio=(0.75, 1.3333), interpolation=InterpolationMode.BICUBIC),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.ColorJitter(brightness=(0.6, 1.4), contrast=(0.6, 1.4), saturation=(0.6, 1.4), hue=0),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5000, 0.5000, 0.5000],std=[0.5000, 0.5000, 0.5000]),
+                
             ])
+        
+        
 
     def create_datasets(self)->Dataset:
         train_dataset = CustomDataset(df=self.train_df, transform=self.transform)
@@ -65,10 +84,43 @@ class ImageClassifier:
         test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
         return train_loader, test_loader
 
-    def create_model(self,finetune:bool):
-        model = resnet50(weights=ResNet50_Weights.DEFAULT)
-        num_ftrs = model.fc.in_features
-        model.fc=torch.nn.Linear(num_ftrs,3)#len(self.train_df['class'].unique())
+    def create_model(self,finetune:bool=False,model_name:str="resnet50")->torch.nn.Module:
+        
+        if model_name=="resnet50":
+            model = resnet50(weights=ResNet50_Weights.DEFAULT)
+            num_ftrs = model.fc.in_features
+            model.fc=torch.nn.Linear(num_ftrs,3)#len(self.train_df['class'].unique())
+            if finetune:
+                for p in model.parameters():
+                    p.requires_grad=False
+                for p in model.fc.parameters():
+                    p.requires_grad=True
+
+        if model_name=="densenet121":
+            model = densenet121(weights=DenseNet121_Weights)
+            num_ftrs = model.classifier.in_features
+            model.fc=torch.nn.Linear(num_ftrs,3)#len(self.train_df['class'].unique())
+            if finetune:
+                for p in model.parameters():
+                    p.requires_grad=False
+                for p in model.classifier.parameters():
+                    p.requires_grad=True
+            
+        if model_name=="resnet50v2":
+            model = timm.create_model('resnetv2_50.a1h_in1k', pretrained=False)
+            model.head.fc=torch.nn.Conv2d(2048,3,kernel_size=1,stride=1)
+            if finetune:
+                for p in model.parameters():
+                    p.requires_grad=False
+                for p in model.head.parameters():
+                    p.requires_grad=True
+
+
+
+
+        
+        #model.load_state_dict(torch.load("/workspace/data/mea/august/flooded_road/training_logs/30/exp03_best.pt"))
+        
         #model=VitGenerator("vit_base",patch_size=8,device='cpu',evaluate=False,verbose=True)
         #model.model.head = torch.nn.Linear(model.model.embed_dim,len(self.train_df['class'].unique()))
         #model=model.model
@@ -76,11 +128,8 @@ class ImageClassifier:
         #patch.timm(model)
         #model.r = 16
         #model.head=torch.nn.Linear(in_features=768, out_features=len(self.train_df["class"].unique()), bias=True)
-        if finetune:
-            for p in model.parameters():
-                p.requires_grad=False
-            for p in model.fc.parameters():
-                p.requires_grad=True
+        
+                
 
         print("check layers")
         for name, param in model.named_parameters():
@@ -114,43 +163,157 @@ class ImageClassifier:
             plt.savefig(self.current_log+"validating_acc.jpg")
             plt.close()
             
-    def unfreeze(self,epoch:int,model:torch.nn.Module,model_name:str="resnet50")->torch.nn.Module:
-        if model_name=="resnet50":
-            if epoch ==1:
-                print("unfreeze layer1")
-                for name, p in model.layer1.named_parameters():
-                    p.requires_grad=True
-                    print(f"{name}:   requires_grad={p.requires_grad}")
+    def unfreeze(self,epoch:int,model:torch.nn.Module,model_name:str="resnet50",method:str="top-bottom")->torch.nn.Module:
+
+        if method=="top-bottom":
+            if model_name=="resnet50":
+                if epoch ==4:
+                    print("unfreeze layer4")
+                    for name, p in model.layer4.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==8:
+                    print("unfreeze layer3")
+                    for name, p in model.layer3.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==12:
+                    print("unfreeze layer2")
+                    for name, p in model.layer2.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==15:
+                    print("unfreeze layer1")
+                    for name, p in model.layer1.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==18: #unfreeze all
+                    print("unfreeze all")
+                    for name, p in model.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
                 return model
                 
-            elif epoch==8:
-                print("unfreeze layer2")
-                for name, p in model.layer2.named_parameters():
-                    p.requires_grad=True
-                    print(f"{name}:   requires_grad={p.requires_grad}")
+            if model_name=="resnet50v2":
+                if epoch ==4:
+                    print("unfreeze layer4")
+                    for name, p in model.stages[3].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==8:
+                    print("unfreeze layer3")
+                    for name, p in model.stages[2].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==12:
+                    print("unfreeze layer2")
+                    for name, p in model.stages[1].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==15:
+                    print("unfreeze layer1")
+                    for name, p in model.stages[0].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==18: #unfreeze all
+                    print("unfreeze all")
+                    for name, p in model.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
                 return model
-                
-            elif epoch==12:
-                print("unfreeze layer3")
-                for name, p in model.layer3.named_parameters():
-                    p.requires_grad=True
-                    print(f"{name}:   requires_grad={p.requires_grad}")
+
+
+            if model_name=="densenet121":
+                if epoch ==4:
+                    print("unfreeze denseblock4")
+                    for name, p in model.features[-2:].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==8:
+                    print("unfreeze denseblock3")
+                    for name, p in model.features[-4:].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==12:
+                    print("unfreeze denseblock2")
+                    for name, p in model.features[-6:].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==15:
+                    print("unfreeze denseblock1")
+                    for name, p in model.features[-8:].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==18: #unfreeze all
+                    print("unfreeze all")
+                    for name, p in model.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
                 return model
-                
-            elif epoch==15:
-                print("unfreeze layer4")
-                for name, p in model.layer4.named_parameters():
-                    p.requires_grad=True
-                    print(f"{name}:   requires_grad={p.requires_grad}")
+
+        if method=="bottom-top":
+            if model_name=="densenet121":
+                if epoch ==4:
+                    print("unfreeze denseblock4")
+                    for name, p in model.features[-2:].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==8:
+                    print("unfreeze denseblock3")
+                    for name, p in model.features[:4].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==12:
+                    print("unfreeze denseblock2")
+                    for name, p in model.features[:8].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==15:
+                    print("unfreeze denseblock1")
+                    for name, p in model.features[:10].named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
+                    return model
+                    
+                elif epoch==18: #unfreeze all
+                    print("unfreeze all")
+                    for name, p in model.named_parameters():
+                        p.requires_grad=True
+                        print(f"{name}:   requires_grad={p.requires_grad}")
                 return model
-                
-            elif epoch==18: #unfreeze all
-                print("unfreeze all")
-                for name, p in model.named_parameters():
-                    p.requires_grad=True
-                    print(f"{name}:   requires_grad={p.requires_grad}")
-            return model
-        else:
+            
+            
+
             print(f"no model_name: {model_name}")
 
     def train_model(self, model, train_loader:DataLoader, test_loader:DataLoader, criterion:torch.nn, optimizer:torch.optim, num_epochs:int=15,lr_scheduler=None,unfreeze_each_e:bool=False,use_amp:bool=False):
@@ -169,17 +332,18 @@ class ImageClassifier:
         model = model.to(device)
         l_acc=[]
         l_train_loss=[]
+        
         for epoch in tqdm(range(num_epochs)):
             model.train()
             running_loss = 0.0
             if unfreeze_each_e:
-                model=self.unfreeze(epoch=epoch,model=model,model_name="resnet50")
+                model=self.unfreeze(epoch=epoch,model=model,model_name=self.model_name,method="bottom-top")
             
             if epoch==0:#set lr ==0.01 at epoch0 (warm-up)
-                optimizer.param_groups[0]["lr"]=0.01
+                optimizer.param_groups[0]["lr"]=1e-2
             
             elif epoch==1:#set lr ==0.001 for normal training
-                optimizer.param_groups[0]["lr"]=0.001
+                optimizer.param_groups[0]["lr"]=1e-3
                 
             for inputs, labels in train_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -207,8 +371,8 @@ class ImageClassifier:
             
             #for logging
             if epoch==0:
-                before_lr = 0.001
-                after_lr = 0.00095
+                before_lr = 0.01
+                after_lr = 0.001
             epoch_loss = running_loss / len(train_loader.dataset)
             print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {epoch_loss:.4f},Lr :{before_lr}/{after_lr}")
             l_train_loss.append(epoch_loss)
@@ -218,13 +382,16 @@ class ImageClassifier:
             with torch.no_grad():
                 for inputs, labels in test_loader:
                     inputs, labels = inputs.to(device), labels.to(device)
+                
                     outputs = model(inputs)
+                    
                     _, predicted = torch.max(outputs, 1)
                     total += labels.size(0)
                     correct += (predicted == labels).sum().item()
             accuracy = correct / total
             wandb.log({"acc_on_validation": accuracy, "train_loss": epoch_loss,"lr_before":before_lr,"lr_after":after_lr})
             print(f"Accuracy on test set: {accuracy:.4f}")
+            
             if accuracy>=max_acc:
                 max_acc=accuracy
                 if epoch>=10: ### change later
@@ -239,7 +406,7 @@ class ImageClassifier:
         print('Training completed')
         print("try save model")
         try:
-            torch.save(model.state_dict(), self.current_log+"exp02_last.pt")
+            torch.save(model.state_dict(), self.current_log+"exp03_last.pt")
             print("save complete")
         except Exception as e:
             print(e)
@@ -251,9 +418,9 @@ class ImageClassifier:
         self.plot_jaa("acc")
 
         
-    def predict(self,model,test_loader:DataLoader)->np.ndarray:
+    def predict(self,model:torch.nn.Module,test_loader:DataLoader)->np.ndarray:
         pred=[]
-        model.to('cpu')
+        model.eval()
         with torch.no_grad():
             for inputs, labels in test_loader:
                 inputs, labels = inputs, labels
@@ -284,32 +451,38 @@ if __name__ == "__main__":
     # track hyperparameters and run metadata
     config={
     "learning_rate": 0.001,
-    "architecture": "resnet50_imnet1k",
+    "architecture": "densenet121_imnet1k",
     "dataset": "flooded_3class",
     "epochs": 30,
     "optimizer": "Adam",
     "batch_size":12,
-    "device":"cpu",
-    "finetune":False,
+    "device":"gpu",
+    "finetune":True,
+    "amp":False,
     }
     )
     e=time.time()
     print("-"*20+" init complete "+"-"*20)
-    print(f"take {e-s} secconds")
-    train_df = pd.read_csv("/workspace/august/flooded_road/train_3c.csv")
-    val_df=pd.read_csv("/workspace/august/flooded_road/val_3c.csv")
+    print(f"take {e-s} secconds")#data/mea/august/flooded_road/train_more.csv
+    train_df = pd.read_csv("/workspace/data/mea/august/flooded_road/train_3c.csv")
+    val_df=pd.read_csv("/workspace/data/mea/august/flooded_road/val_3c.csv")
     
     #test_df = pd.read_csv("/workspace/august/flooded_road/test_2c_water_no.csv")
-    classifier = ImageClassifier(train_df, val_df,log_path=p_dir+"/"+"/training_logs/")
+    classifier = ImageClassifier(train_df, val_df,log_path=p_dir+"/"+"/training_logs/",model_name="resnet50v2")
     train_loader, test_loader = classifier.create_dataloaders(batch_size=12)
-    model = classifier.create_model(finetune=False)
+    model = classifier.create_model(finetune=True,model_name=classifier.model_name)
     criterion = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     scheduler=lr_scheduler.ExponentialLR(optimizer, gamma=0.95)
     s=time.time()
-    classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=30,lr_scheduler=scheduler,unfreeze_each_e=False,use_amp=False)
+    #classifier.train_model(model, train_loader, test_loader, criterion, optimizer, num_epochs=20,lr_scheduler=scheduler,unfreeze_each_e=False,use_amp=False)
     e=time.time()
     print(f"take time {e-s}")
     wandb.finish()
-    print(classifier.predict(model,test_loader)) #test
+    
+   #test and save predictions to .csv
+    model.load_state_dict(torch.load("/workspace/data/mea/august/flooded_road/training_logs/68/exp03_best.pt"))
+    arr_res=classifier.predict(model,test_loader=test_loader)
+    val_df["preds"]=arr_res
+    val_df.to_csv("/workspace/data/mea/august/flooded_road/training_logs/68/res.csv",index=False)
     print("-"*20+" finish "+"\U0001F925"*5)

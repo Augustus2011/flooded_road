@@ -29,3 +29,11 @@ if __name__ == "__main__":
     
     # Wait for 100 seconds before exiting (optional)
     time.sleep(100)
+
+
+
+""""https://mhole.b.cils.cloud/api/v1/static/falcon/latest.png
+
+https://mhole.b.cils.cloud/api/v1/static/neptune/latest.png
+
+https://mhole.b.cils.cloud/api/v1/static/odessey/latest.png"""
